@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LaTeX Formula Recognition</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f4f4f9;
+        }
+
+        .container {
+            text-align: center;
+            background-color: #ffffff;
+            border: 2px solid #ccc;
+            border-radius: 10px;
+            padding: 20px;
+            width: 400px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            font-size: 1.5em;
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        label {
+            font-size: 1em;
+            color: #555;
+            display: block;
+            margin-bottom: 10px;
+        }
+
+        input[type="file"] {
+            margin: 10px 0;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            width: 100%;
+            cursor: pointer;
+        }
+
+        button {
+            background-color: #3b82f6;
+            color: #ffffff;
+            border: none;
+            border-radius: 5px;
+            padding: 10px 20px;
+            font-size: 1em;
+            cursor: pointer;
+            margin-top: 10px;
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #2563eb;
+        }
+
+        #result-container {
+            position: relative;
+            margin-top: 20px;
+            font-size: 1.2em;
+            color: #333;
+            background-color: #f9f9f9;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            text-align: left;
+        }
+
+        #copyButton {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background-color: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            padding: 5px 10px;
+            cursor: pointer;
+            font-size: 0.8em;
+            transition: background-color 0.3s ease;
+        }
+
+        #copyButton:hover {
+            background-color: #2563eb;
+        }
+
+        /* 模态窗口样式 */
+        #historyModal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            width: 80%;
+            max-width: 500px;
+            text-align: left;
+            position: relative;
+        }
+
+        .modal-content h2 {
+            margin-top: 0;
+            display: inline-block;
+        }
+
+        .close, .delete-history {
+            color: #aaa;
+            font-size: 1.5em;
+            font-weight: bold;
+            cursor: pointer;
+            position: absolute;
+            top: 10px;
+        }
+
+        .close {
+            right: 10px;
+        }
+
+        .delete-history {
+            right: 50px;
+            color: #f44336;
+        }
+
+        .close:hover {
+            color: #000;
+        }
+
+        .delete-history:hover {
+            color: #d32f2f;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Upload an Image for LaTeX Formula Recognition</h1>
+        <form action="/upload" method="post" enctype="multipart/form-data">
+            <label for="file">Choose an image:</label>
+            <input type="file" id="file" name="file" accept="image/*" required>
+            <button type="submit">Upload</button>
+        </form>
+        <button onclick="fetchHistory()">View History</button>
+        <div id="result-container" style="display: none;">
+            <pre id="result"></pre>
+            <button id="copyButton" onclick="copyToClipboard()">Copy</button>
+        </div>
+    </div>
+
+    <!-- 模态窗口 -->
+    <div id="historyModal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <span class="delete-history" onclick="clearHistory()">🗑️</span>
+            <h2>Upload History</h2>
+            <div id="historyContent"></div>
+        </div>
+    </div>
+
+    <script>
+        const form = document.querySelector('form');
+        const resultDiv = document.getElementById('result');
+        const resultContainer = document.getElementById('result-container');
+        const copyButton = document.getElementById('copyButton');
+        const historyModal = document.getElementById('historyModal');
+        const historyContent = document.getElementById('historyContent');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            resultDiv.innerHTML = 'Processing...';
+            resultContainer.style.display = 'block';
+            
+            const formData = new FormData(form);
+            const response = await fetch('/upload', {
+                method: 'POST',
+                body: formData,
+            });
+            
+            const data = await response.json();
+            if (response.ok && data.latex) {
+                resultDiv.textContent = data.latex;
+            } else {
+                resultDiv.textContent = 'Error: Could not recognize formula.';
+            }
+        });
+
+        function copyToClipboard() {
+            const textToCopy = resultDiv.textContent;
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                copyButton.textContent = 'Copied!';
+                setTimeout(() => {
+                    copyButton.textContent = 'Copy';
+                }, 1500);
+            }).catch(err => {
+                console.error('Failed to copy text: ', err);
+            });
+        }
+
+        async function fetchHistory() {
+            const response = await fetch('/history');
+            const data = await response.json();
+            historyContent.innerHTML = data.length
+                ? data.map(record => `
+                    <div><strong>ID:</strong> ${record.id}, <strong>Formula:</strong> ${record.formula}, <strong>Date:</strong> ${new Date(record.timestamp).toLocaleString()}</div>
+                    <hr>
+                `).join('')
+                : '<p>No history available.</p>';
+            historyModal.style.display = 'flex';
+        }
+
+        async function clearHistory() {
+            const response = await fetch('/clear_history', { method: 'POST' });
+            const data = await response.json();
+
+            if (data.status === 'success') {
+                historyContent.innerHTML = '<p>No history available.</p>';
+            } else {
+                console.error('Failed to clear history:', data.message);
+                alert('Error clearing history.');
+            }
+        }
+
+        function closeModal() {
+            historyModal.style.display = 'none';
+        }
+
+        // 点击模态窗口外部关闭模态窗口
+        window.onclick = function(event) {
+            if (event.target == historyModal) {
+                closeModal();
+            }
+        }
+    </script>
+</body>
+</html>
