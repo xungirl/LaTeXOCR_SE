@@ -14,7 +14,7 @@ db = SQLAlchemy(app)
 
 # 定义数据库模型
 class ImageRecord(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(db.Integer, primary_key=True, autoincrement=False)  # 禁用自动递增
     file_path = db.Column(db.String(255), nullable=False)
     formula = db.Column(db.Text, nullable=True)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
@@ -56,8 +56,11 @@ def upload_file():
         # 提取公式部分
         latex_formula = response_data.get('res', {}).get('latex', None)
 
+        # 获取当前最大 ID，确保 ID 重新排序时能正确处理
+        max_id = db.session.query(db.func.max(ImageRecord.id)).scalar() or 0
+
         # 将记录存储到数据库
-        new_record = ImageRecord(file_path=file_path, formula=latex_formula)
+        new_record = ImageRecord(id=max_id + 1, file_path=file_path, formula=latex_formula)
         db.session.add(new_record)
         db.session.commit()
 
@@ -75,7 +78,7 @@ def history():
         for record in records
     ]
     return jsonify(history_data)
-# 添加清空历史记录的路由
+
 @app.route('/clear_history', methods=['POST'])
 def clear_history():
     try:
@@ -86,6 +89,28 @@ def clear_history():
         db.session.rollback()
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
+@app.route('/delete_record/<int:record_id>', methods=['DELETE'])
+def delete_record(record_id):
+    try:
+        # 删除指定记录
+        record = ImageRecord.query.get(record_id)
+        if not record:
+            return jsonify({'status': 'error', 'message': 'Record not found'}), 404
+
+        db.session.delete(record)
+        db.session.commit()
+
+        # 重新排序ID
+        records = ImageRecord.query.order_by(ImageRecord.timestamp).all()
+        for index, record in enumerate(records, start=1):
+            record.id = index
+        db.session.commit()
+
+        return jsonify({'status': 'success'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True,port=5001)

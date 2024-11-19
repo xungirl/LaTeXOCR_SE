@@ -95,7 +95,6 @@
             background-color: #2563eb;
         }
 
-        /* 模态窗口样式 */
         #historyModal {
             display: none;
             position: fixed;
@@ -120,33 +119,20 @@
 
         .modal-content h2 {
             margin-top: 0;
-            display: inline-block;
         }
 
-        .close, .delete-history {
+        .close {
             color: #aaa;
             font-size: 1.5em;
             font-weight: bold;
             cursor: pointer;
             position: absolute;
             top: 10px;
-        }
-
-        .close {
             right: 10px;
-        }
-
-        .delete-history {
-            right: 50px;
-            color: #f44336;
         }
 
         .close:hover {
             color: #000;
-        }
-
-        .delete-history:hover {
-            color: #d32f2f;
         }
     </style>
 </head>
@@ -165,11 +151,9 @@
         </div>
     </div>
 
-    <!-- 模态窗口 -->
     <div id="historyModal">
         <div class="modal-content">
             <span class="close" onclick="closeModal()">&times;</span>
-            <span class="delete-history" onclick="clearHistory()">🗑️</span>
             <h2>Upload History</h2>
             <div id="historyContent"></div>
         </div>
@@ -219,22 +203,26 @@
             const data = await response.json();
             historyContent.innerHTML = data.length
                 ? data.map(record => `
-                    <div><strong>ID:</strong> ${record.id}, <strong>Formula:</strong> ${record.formula}, <strong>Date:</strong> ${new Date(record.timestamp).toLocaleString()}</div>
+                    <div>
+                        <strong>ID:</strong> ${record.id}, 
+                        <strong>Formula:</strong> ${record.formula}, 
+                        <strong>Date:</strong> ${new Date(record.timestamp).toLocaleString()}
+                        <button onclick="deleteRecord(${record.id})" style="margin-left: 10px;">Delete</button>
+                    </div>
                     <hr>
                 `).join('')
                 : '<p>No history available.</p>';
             historyModal.style.display = 'flex';
         }
 
-        async function clearHistory() {
-            const response = await fetch('/clear_history', { method: 'POST' });
+        async function deleteRecord(id) {
+            const response = await fetch(`/delete_record/${id}`, { method: 'DELETE' });
             const data = await response.json();
 
             if (data.status === 'success') {
-                historyContent.innerHTML = '<p>No history available.</p>';
+                fetchHistory();
             } else {
-                console.error('Failed to clear history:', data.message);
-                alert('Error clearing history.');
+                alert('Error deleting record: ' + data.message);
             }
         }
 
@@ -242,12 +230,11 @@
             historyModal.style.display = 'none';
         }
 
-        // 点击模态窗口外部关闭模态窗口
         window.onclick = function(event) {
             if (event.target == historyModal) {
                 closeModal();
             }
-        }
+        };
     </script>
 </body>
 </html>
